@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="referrer" content="no-referrer">
+<title>Confirmar exclusão</title>
+<style>
+  :root { --bg:#f7f7f5; --fg:#1d1d1b; --muted:#6b6b66; --card:#fff; --line:#e3e3de; --danger:#a12a2a; }
+  @media (prefers-color-scheme: dark) { :root { --bg:#161615; --fg:#ecece8; --muted:#a3a39c; --card:#1f1f1d; --line:#33332f; --danger:#ff8b8b; } }
+  body { margin:0; background:var(--bg); color:var(--fg); font:15px/1.5 system-ui, sans-serif; }
+  main { max-width:640px; margin:0 auto; padding:24px 16px; }
+  .card { background:var(--card); border:1px solid var(--line); border-radius:10px; padding:16px; }
+  button { font:inherit; padding:10px 16px; border-radius:8px; border:1px solid var(--danger); background:var(--danger); color:#fff; cursor:pointer; }
+  .muted { color:var(--muted); }
+</style>
+</head>
+<body>
+<main>
+  <h1 style="font-size:22px">Excluir prescrição na Memed</h1>
+  <div class="card">
+    <p>Prescrição: <strong id="pid"></strong></p>
+    <p id="motivo" class="muted"></p>
+    <p id="estado"></p>
+    <button id="ok">Confirmar exclusão</button>
+  </div>
+</main>
+<script id="cfg" type="application/json">__CONFIG_JSON__</script>
+<script>
+(function () {
+  const cfg = JSON.parse(document.getElementById('cfg').textContent);
+  const $ = (id) => document.getElementById(id);
+  $('pid').textContent = cfg.memed_prescricao_id;
+  $('motivo').textContent = cfg.motivo ? 'Motivo informado pelo assistente: ' + cfg.motivo : '';
+  if (cfg.status !== 'pendente') { $('estado').textContent = 'Status: ' + cfg.status; $('ok').hidden = true; return; }
+  $('ok').onclick = async () => {
+    if (!confirm('Excluir definitivamente a prescrição ' + cfg.memed_prescricao_id + '?')) return;
+    $('ok').disabled = true;
+    const r = await fetch(cfg.base + '/confirmar', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ nonce: cfg.nonce }) });
+    const j = await r.json().catch(() => ({}));
+    $('estado').textContent = r.ok ? 'Excluída na Memed.' : ('Erro: ' + (j.erro || r.status));
+    $('ok').hidden = r.ok;
+    $('ok').disabled = false;
+  };
+})();
+</script>
+</body>
+</html>

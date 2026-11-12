@@ -1,0 +1,19 @@
+services:
+  memed-mcp:
+    build: .
+    image: memed-mcp:latest
+    container_name: memed-mcp
+    restart: unless-stopped
+    env_file: .env
+    ports:
+      - "8765:8765"   # exponha só na LAN/VPN; para acesso externo use um proxy reverso com TLS
+    volumes:
+      - memed-data:/data
+    read_only: true
+    tmpfs:
+      - /tmp
+    security_opt:
+      - no-new-privileges:true
+
+volumes:
+  memed-data:

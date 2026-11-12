@@ -1,0 +1,178 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="referrer" content="no-referrer">
+<title>Revisar prescrição</title>
+<style>
+  :root { --bg:#f7f7f5; --fg:#1d1d1b; --muted:#6b6b66; --card:#fff; --line:#e3e3de; --warn:#8a5a00; --warnbg:#fff4dc; --ok:#1f6f3d; --okbg:#e3f4e9; --danger:#a12a2a; }
+  @media (prefers-color-scheme: dark) { :root { --bg:#161615; --fg:#ecece8; --muted:#a3a39c; --card:#1f1f1d; --line:#33332f; --warn:#f2c45a; --warnbg:#3a2f12; --ok:#7fd49e; --okbg:#173323; --danger:#ff8b8b; } }
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--bg); color:var(--fg); font:15px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif; }
+  main { max-width:960px; margin:0 auto; padding:24px 16px 64px; }
+  h1 { font-size:22px; margin:0 0 4px; }
+  .muted { color:var(--muted); }
+  .card { background:var(--card); border:1px solid var(--line); border-radius:10px; padding:16px; margin:16px 0; }
+  .banner { border-radius:10px; padding:12px 16px; margin:16px 0; }
+  .warn { background:var(--warnbg); color:var(--warn); }
+  .ok { background:var(--okbg); color:var(--ok); }
+  table { width:100%; border-collapse:collapse; }
+  td, th { text-align:left; padding:6px 8px; border-bottom:1px solid var(--line); vertical-align:top; }
+  th { font-weight:600; width:30%; }
+  ol { padding-left:20px; } li { margin-bottom:10px; }
+  button { font:inherit; padding:10px 16px; border-radius:8px; border:1px solid var(--line); background:var(--card); color:var(--fg); cursor:pointer; }
+  button.primary { background:#1f5fbf; color:#fff; border-color:#1f5fbf; }
+  button.danger { color:var(--danger); }
+  pre { white-space:pre-wrap; margin:0; font:inherit; }
+  .env { display:inline-block; font-size:12px; padding:2px 8px; border-radius:99px; border:1px solid var(--line); }
+</style>
+</head>
+<body>
+<main>
+  <h1>Revisar prescrição <span class="env" id="env"></span></h1>
+  <p class="muted">Preparada por um assistente de IA. Nada foi emitido. Confira tudo e emita você mesmo no módulo da Memed abaixo.</p>
+
+  <div class="banner warn" id="status-banner">Rascunho pendente de revisão médica.</div>
+
+  <section class="card">
+    <h2 style="font-size:17px;margin-top:0">Paciente</h2>
+    <table id="paciente"></table>
+    <p id="alergias"></p>
+  </section>
+
+  <section class="card">
+    <h2 style="font-size:17px;margin-top:0">Itens propostos</h2>
+    <ol id="itens"></ol>
+  </section>
+
+  <section class="card" id="nota-card" hidden>
+    <h2 style="font-size:17px;margin-top:0">Nota do assistente (não vai para a receita)</h2>
+    <pre id="nota"></pre>
+  </section>
+
+  <section class="card" id="acoes">
+    <button class="primary" id="abrir">Abrir no módulo da Memed</button>
+    <button class="danger" id="descartar">Descartar rascunho</button>
+    <p class="muted" id="msg"></p>
+  </section>
+</main>
+
+<script id="cfg" type="application/json">__CONFIG_JSON__</script>
+<script>
+(function () {
+  const cfg = JSON.parse(document.getElementById('cfg').textContent);
+  const d = cfg.rascunho;
+  const $ = (id) => document.getElementById(id);
+  const text = (el, t) => { el.textContent = t; return el; };
+
+  $('env').textContent = cfg.ambiente === 'prod' ? 'PRODUÇÃO' : 'homologação';
+
+  const p = d.paciente;
+  const rows = [['Nome', p.nome], ['Nome social', p.nome_social], ['CPF', p.cpf || 'não informado'],
+    ['Nascimento', p.data_nascimento], ['Telefone', p.telefone], ['Endereço', p.endereco], ['Cidade', p.cidade],
+    ['Mãe', p.nome_mae], ['Peso (kg)', p.peso_kg], ['Altura (m)', p.altura_m], ['ID externo', p.id_externo]];
+  for (const [k, v] of rows) {
+    if (v === null || v === undefined || v === '') continue;
+    const tr = document.createElement('tr');
+    tr.append(text(document.createElement('th'), k), text(document.createElement('td'), String(v)));
+    $('paciente').append(tr);
+  }
+  text($('alergias'), d.alergias.length ? 'Alergias informadas: ' + d.alergias.join(', ') : 'Nenhuma alergia informada. Confirme com o paciente.');
+
+  for (const it of d.itens) {
+    const li = document.createElement('li');
+    const b = text(document.createElement('strong'), it.nome + (it.tipo === 'texto_livre' ? ' (texto livre)' : ''));
+    const pre = text(document.createElement('pre'), it.posologia);
+    li.append(b, pre);
+    const extra = [it.quantidade && ('Quantidade: ' + it.quantidade), it.via && ('Via: ' + it.via)].filter(Boolean).join(' · ');
+    if (extra) li.append(text(document.createElement('div'), extra));
+    $('itens').append(li);
+  }
+  if (d.nota_para_medico) { $('nota-card').hidden = false; text($('nota'), d.nota_para_medico); }
+
+  function setStatus(kind, msg) { const b = $('status-banner'); b.className = 'banner ' + kind; b.textContent = msg; }
+  if (cfg.status !== 'rascunho') {
+    setStatus(cfg.status === 'emitida' ? 'ok' : 'warn', 'Este rascunho está com status: ' + cfg.status + '.');
+    $('acoes').hidden = true;
+    return;
+  }
+
+  async function post(path, body) {
+    const r = await fetch(path, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(Object.assign({ nonce: cfg.nonce }, body || {})) });
+    if (!r.ok) throw new Error('HTTP ' + r.status);
+    return r.json();
+  }
+
+  $('descartar').onclick = async () => {
+    if (!confirm('Descartar este rascunho?')) return;
+    try { await post(cfg.base + '/descartar'); setStatus('warn', 'Rascunho descartado.'); $('acoes').hidden = true; }
+    catch (e) { text($('msg'), 'Erro ao descartar: ' + e.message); }
+  };
+
+  // ---------------------------------------------------------------------
+  // Integração com o módulo frontend da Memed (Sinapse Prescrição).
+  // VERIFICAR na documentação (doc.memed.com.br > Funções Frontend) os nomes
+  // exatos dos comandos e campos: setPaciente, setAllergy, addItem e o evento
+  // prescricaoImpressa. Toda a dependência da Memed está concentrada aqui.
+  // ---------------------------------------------------------------------
+  function pacienteMemed() {
+    const out = { nome: p.nome, idExterno: p.id_externo || ('mcp-' + cfg.id) };
+    if (p.cpf) out.cpf = p.cpf; else out.withoutCpf = true;
+    if (p.telefone) out.telefone = p.telefone;
+    if (p.endereco) out.endereco = p.endereco;
+    if (p.cidade) out.cidade = p.cidade;
+    if (p.data_nascimento) out.data_nascimento = p.data_nascimento;
+    if (p.nome_social) out.nome_social = p.nome_social;
+    if (p.nome_mae) out.nome_mae = p.nome_mae;
+    if (p.peso_kg) out.peso = p.peso_kg;
+    if (p.altura_m) out.altura = p.altura_m;
+    return out;
+  }
+  function itemMemed(it) {
+    const posologia = it.via ? (it.posologia + ' (via ' + it.via + ')') : it.posologia;
+    const out = { nome: it.nome, posologia: posologia };
+    if (it.quantidade) out.quantidade = it.quantidade;
+    return out;
+  }
+
+  async function preencher() {
+    const cmd = (name, payload) => MdHub.command.send('plataforma.prescricao', name, payload);
+    await cmd('setPaciente', pacienteMemed());
+    if (d.alergias.length) {
+      try { await cmd('setAllergy', d.alergias.map((nome) => ({ nome }))); }
+      catch (e) { console.warn('setAllergy falhou; informe as alergias manualmente', e); }
+    }
+    for (const it of d.itens) await cmd('addItem', itemMemed(it));
+    MdHub.module.show('plataforma.prescricao');
+    text($('msg'), 'Módulo aberto e preenchido. Revise e emita na Memed. Esta página registra a emissão automaticamente.');
+  }
+
+  function carregarMemed() {
+    $('abrir').disabled = true;
+    text($('msg'), 'Carregando o módulo da Memed...');
+    const s = document.createElement('script');
+    s.src = cfg.script_url;
+    s.dataset.token = cfg.token;
+    s.dataset.color = '#1f5fbf';
+    s.onerror = () => text($('msg'), 'Não foi possível carregar o script da Memed.');
+    s.onload = () => {
+      MdSinapsePrescricao.event.add('core:moduleInit', (mod) => {
+        if (mod.name !== 'plataforma.prescricao') return;
+        MdHub.event.add('prescricaoImpressa', async (ev) => {
+          const id = ev && ev.prescricao && ev.prescricao.id;
+          try {
+            const r = await post(cfg.base + '/emitida', { prescricao_id: String(id) });
+            setStatus('ok', 'Emitida e confirmada na Memed (prescrição ' + r.memed_prescricao_id + ').');
+          } catch (e) { setStatus('warn', 'Emitida na Memed, mas não consegui registrar aqui: ' + e.message); }
+        });
+        preencher().catch((e) => text($('msg'), 'Erro ao preencher: ' + e.message + '. Preencha manualmente.'));
+      });
+    };
+    document.body.appendChild(s);
+  }
+  $('abrir').onclick = carregarMemed;
+})();
+</script>
+</body>
+</html>
