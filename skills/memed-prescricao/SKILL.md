@@ -23,6 +23,14 @@ rascunhos; o médico abre o link, confere no módulo oficial da Memed e emite (e
 5. **Confirmar** só com `status_rascunho`. Diga "emitida" apenas quando o status for `emitida` e houver `memed_prescricao_id`.
    Se precisar do PDF, use `obter_pdf`.
 
+## Controle especial (Portaria 344/98)
+
+- Identifique a lista do fármaco e o documento exigido: Notificação A (amarela, listas A1-A3),
+  B (azul, B1), B2 (azul, anorexígenos) ou Receita de Controle Especial em 2 vias (C1, C5, antimicrobianos).
+- Escreva na `nota_para_medico` qual notificação se aplica, a quantidade máxima permitida e o período de tratamento.
+- A numeração SNCR das notificações é do médico e é aplicada pela Memed na emissão. **Nunca peça,
+  invente, registre ou repasse números de notificação.** Se o médico informar algum, não o use em nenhuma ferramenta.
+
 ## Atestados
 
 - Texto formal, com período de afastamento em dias e data de início, por extenso quando útil
