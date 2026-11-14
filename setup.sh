@@ -88,8 +88,9 @@ fi
 say "Subindo o serviço..."
 docker compose up -d
 sleep 3
-. ./.env
-curl -fsS "http://127.0.0.1:${PORT:-8765}/healthz" >/dev/null && echo "Serviço no ar."
+envget() { grep -m1 "^$1=" .env | cut -d= -f2-; }
+PUBLIC_BASE_URL=$(envget PUBLIC_BASE_URL); MCP_AUTH_TOKEN=$(envget MCP_AUTH_TOKEN)
+curl -fsS "http://127.0.0.1:8765/healthz" >/dev/null && echo "Serviço no ar."
 
 say "Pronto. Para conectar o Claude Code (no seu computador), rode:"
 echo "claude mcp add --transport http memed ${PUBLIC_BASE_URL}/mcp --header \"Authorization: Bearer ${MCP_AUTH_TOKEN}\""
